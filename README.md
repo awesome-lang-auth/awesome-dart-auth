@@ -4,14 +4,14 @@
 [![Shelf](https://img.shields.io/badge/Shelf-1.4+-green.svg)](https://pub.dev/packages/shelf)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-**Server-side authentication library for Dart backends** (Shelf / Dart Frog) that replicates the [awesome-node-auth](https://github.com/nik2208/awesome-node-auth) Node.js backend in Dart.
+**Server-side authentication library for Dart backends** (Shelf / Dart Frog) that replicates the [awesome-node-auth](https://github.com/awesome-lang-auth/awesome-node-auth) Node.js backend in Dart.
 
 > **Important:** `awesome-dart-auth` is a server-side package.  
-> Flutter client support continues through the existing [`awesome-node-auth-flutter`](https://github.com/nik2208/awesome-node-auth-flutter) client package.
+> Flutter client support continues through the existing [`awesome-node-auth-flutter`](https://github.com/awesome-lang-auth/awesome-flutter-auth) client package.
 
 Fully compatible with:
-- **[ng-awesome-node-auth](https://github.com/nik2208/ng-awesome-node-auth)** — Angular client library
-- **[awesome-node-auth-flutter](https://github.com/nik2208/awesome-node-auth-flutter)** — Flutter/Dart client library
+- **[ng-awesome-node-auth](https://github.com/awesome-lang-auth/awesome-angular-auth)** — Angular client library
+- **[awesome-node-auth-flutter](https://github.com/awesome-lang-auth/awesome-flutter-auth)** — Flutter/Dart client library
 
 Supports **both authentication strategies** used by those clients:
 

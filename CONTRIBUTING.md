@@ -5,7 +5,7 @@ Thank you for your interest in contributing! This guide explains how to get star
 ## Development setup
 
 ```bash
-git clone https://github.com/nik2208/awesome-dart-auth
+git clone https://github.com/awesome-lang-auth/awesome-dart-auth
 cd awesome-dart-auth
 dart pub get
 dart run melos bootstrap
