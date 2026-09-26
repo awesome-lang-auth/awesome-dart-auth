@@ -12,7 +12,7 @@
 
 **Please do not open a public GitHub issue for security vulnerabilities.**
 
-To report a security issue, open a [GitHub Security Advisory](https://github.com/nik2208/awesome-dart-auth/security/advisories/new) (private disclosure). You can also use the **"Report a vulnerability"** button on the [Security tab](https://github.com/nik2208/awesome-dart-auth/security).
+To report a security issue, open a [GitHub Security Advisory](https://github.com/awesome-lang-auth/awesome-dart-auth/security/advisories/new) (private disclosure). You can also use the **"Report a vulnerability"** button on the [Security tab](https://github.com/awesome-lang-auth/awesome-dart-auth/security).
 
 Please include:
 
