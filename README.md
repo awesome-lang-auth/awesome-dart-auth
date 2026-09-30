@@ -129,8 +129,19 @@ final config = AuthConfig(
   uiConfig: {'theme': 'dark'},       // Returned by GET /auth/ui/config
   enableIdpMode: true,               // Expose OIDC discovery, JWKS, userinfo, token
   oauthProviders: {'google', 'github'},
+  issueSessionOnRegister: false,     // POST /register also opens a session (default off)
 );
 ```
+
+### Register and sessions (`issueSessionOnRegister`)
+
+Whether `POST /register` also logs the new account in is the instance administrator's choice, the same option in every library of the awesome-lang-auth family.
+
+- **Off (default, as the reference awesome-node-auth):** `201 {"success": true, "userId": "<id>"}`. No token and no session row; the client calls `POST /login` afterwards.
+- **On:** the same `201` body plus the `accessToken`, `refreshToken`, `expiresInSeconds` and `tokenType` fields a successful `POST /login` returns, and the refresh session row is created the way login creates it (device info from `User-Agent`, `identity.session.created` event).
+- A refused registration (`400`, a throwing `onRegister` hook) never issues anything. With the admin email-verification policy set to `strict` (`emailVerificationMode: 'strict'` or `requireEmailVerification: true`), an unverified account gets no session even with the option on. An account the login would challenge for TOTP gets no session either.
+
+> Breaking change: before this option, `POST /register` always answered `200` with `user` and a token pair. To keep that session behaviour, set `issueSessionOnRegister: true` (the body is now the family's `201 {success, userId, ...tokens}`, without `user`).
 
 ---
 
@@ -166,7 +177,7 @@ All endpoints are mounted under `apiBasePath` (default: `/auth`).
 ### Session
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/register` | Create a new account |
+| `POST` | `/register` | Create a new account (`201 {success, userId}`; also opens a session when `issueSessionOnRegister` is on) |
 | `POST` | `/login` | Login with email + password |
 | `POST` | `/logout` | Logout and revoke the current session |
 | `GET` | `/me` | Return the current authenticated user |

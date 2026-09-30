@@ -238,13 +238,11 @@ class AuthRouter {
           );
           final onRegister = callbacks.onRegister;
           if (onRegister != null) user = await onRegister(user);
-          final tokenPair = await authService.issueTokenPair(
-            user: user,
-            userAgent: request.headers['user-agent'],
-          );
-          return _ok(<String, Object?>{
-            'user': _userPayload(user),
-            ...tokenPair.toJson(),
+          return _created(<String, Object?>{
+            'success': true,
+            'userId': user.id,
+            if (_registerOpensSession(user))
+              ...await _issueLoginSession(request, user),
           });
         } on RegistrationException catch (e) {
           return _badRequest(e.message);
@@ -266,13 +264,9 @@ class AuthRouter {
               'userId': user.id,
             });
           }
-          final tokenPair = await authService.issueTokenPair(
-            user: user,
-            userAgent: request.headers['user-agent'],
-          );
           return _ok(<String, Object?>{
             'user': _userPayload(user),
-            ...tokenPair.toJson(),
+            ...await _issueLoginSession(request, user),
           });
         } on AuthenticationException catch (e) {
           return _authError(e.message);
@@ -1350,6 +1344,42 @@ class AuthRouter {
     jsonEncode(payload),
     headers: const {'content-type': 'application/json; charset=utf-8'},
   );
+
+  Response _created(Map<String, Object?> payload) => Response(
+    201,
+    body: jsonEncode(payload),
+    headers: const {'content-type': 'application/json; charset=utf-8'},
+  );
+
+  /// Opens a session for [user] the way a successful `POST /login` does:
+  /// creates the refresh session row and returns the token fields of the
+  /// login body.
+  Future<Map<String, Object?>> _issueLoginSession(
+    Request request,
+    AuthUser user,
+  ) async {
+    final tokenPair = await authService.issueTokenPair(
+      user: user,
+      userAgent: request.headers['user-agent'],
+    );
+    return tokenPair.toJson();
+  }
+
+  /// Whether `POST /register` opens a session for the just-created [user].
+  ///
+  /// Only when [AuthConfig.issueSessionOnRegister] is on, never when the
+  /// email-verification policy is strict and the account is unverified (the
+  /// option must not bypass that gate), and never when the login would
+  /// challenge the account for a second factor.
+  bool _registerOpensSession(AuthUser user) {
+    if (!config.issueSessionOnRegister) return false;
+    if (user.totpEnabled) return false;
+    final strictVerification =
+        _adminSettings['requireEmailVerification'] == true ||
+        _adminSettings['emailVerificationMode'] == 'strict';
+    if (strictVerification && !user.emailVerified) return false;
+    return true;
+  }
 
   Response _badRequest(String message) => Response(
     400,
