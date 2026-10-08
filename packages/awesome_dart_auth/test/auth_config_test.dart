@@ -18,6 +18,23 @@ void main() {
       expect(updated.supportedLocales, contains('fr'));
     });
 
+    test('issueSessionOnRegister defaults to off and copyWith sets it', () {
+      final config = AuthConfig.development(jwtSecret: 'secret1234');
+
+      expect(config.issueSessionOnRegister, isFalse);
+      expect(
+        config.copyWith(issueSessionOnRegister: true).issueSessionOnRegister,
+        isTrue,
+      );
+      expect(
+        config
+            .copyWith(issueSessionOnRegister: true)
+            .copyWith(issuer: 'https://auth.example.com')
+            .issueSessionOnRegister,
+        isTrue,
+      );
+    });
+
     test('throws when no token transport is enabled', () {
       expect(
         () => AuthConfig(

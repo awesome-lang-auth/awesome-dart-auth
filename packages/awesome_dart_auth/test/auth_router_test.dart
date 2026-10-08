@@ -132,6 +132,47 @@ class _TokenStore implements TokenStore {
 Map<String, dynamic> _jsonBody(String body) =>
     jsonDecode(body) as Map<String, dynamic>;
 
+Future<Response> _register(
+  AuthRouter router, {
+  required String email,
+  required String password,
+  Map<String, String> headers = const <String, String>{},
+}) async => router.handler(
+  Request(
+    'POST',
+    Uri.parse('http://localhost/auth/register'),
+    body: jsonEncode({'email': email, 'password': password}),
+    headers: {'content-type': 'application/json', ...headers},
+  ),
+);
+
+/// Registers an account, then logs it in, and returns the login body.
+///
+/// `POST /register` issues no session by default, so the session comes from
+/// `POST /login`, as for any client of the reference.
+Future<Map<String, dynamic>> _registerAndLogin(
+  AuthRouter router, {
+  required String email,
+  required String password,
+}) async {
+  final registerResponse = await _register(
+    router,
+    email: email,
+    password: password,
+  );
+  expect(registerResponse.statusCode, 201);
+  final loginResponse = await router.handler(
+    Request(
+      'POST',
+      Uri.parse('http://localhost/auth/login'),
+      body: jsonEncode({'email': email, 'password': password}),
+      headers: const {'content-type': 'application/json'},
+    ),
+  );
+  expect(loginResponse.statusCode, 200);
+  return _jsonBody(await loginResponse.readAsString());
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -213,23 +254,194 @@ void main() {
       expect(body['tokenType'], 'Bearer');
     });
 
-    test('registers a new user via POST /auth/register', () async {
-      final response = await router.handler(
-        Request(
-          'POST',
-          Uri.parse('http://localhost/auth/register'),
-          body: jsonEncode({
-            'email': 'alice@example.com',
-            'password': 'SecurePass1!',
-          }),
-          headers: const {'content-type': 'application/json'},
-        ),
+    test('registers a new user via POST /auth/register and issues no '
+        'session by default', () async {
+      expect(config.issueSessionOnRegister, isFalse);
+
+      final response = await _register(
+        router,
+        email: 'alice@example.com',
+        password: 'SecurePass1!',
       );
       final body = _jsonBody(await response.readAsString());
 
-      expect(response.statusCode, 200);
-      expect(body['accessToken'], isA<String>());
-      expect((body['user'] as Map<String, dynamic>)['email'], 'alice@example.com');
+      expect(response.statusCode, 201);
+      expect(body.keys, unorderedEquals(<String>['success', 'userId']));
+      expect(body['success'], isTrue);
+      expect(body['userId'], isA<String>());
+      expect(response.headers['set-cookie'], isNull);
+      expect(sessionStore.sessions, isEmpty);
+      final saved = await userStore.findById(body['userId'] as String);
+      expect(saved?.email, 'alice@example.com');
+    });
+
+    group('with issueSessionOnRegister on', () {
+      late AuthRouter onRouter;
+
+      setUp(() {
+        onRouter = AuthRouter(
+          config: config.copyWith(issueSessionOnRegister: true),
+          authService: service,
+          tokenStore: tokenStore,
+        );
+      });
+
+      test('register answers 201 with the login token fields and a session '
+          'row, and GET /me answers on the bearer', () async {
+        final response = await _register(
+          onRouter,
+          email: 'on-bearer@example.com',
+          password: 'SecurePass1!',
+          headers: const {
+            'x-auth-strategy': 'bearer',
+            'user-agent': 'Dart/3.11 (dart:io)',
+          },
+        );
+        final body = _jsonBody(await response.readAsString());
+
+        expect(response.statusCode, 201);
+        expect(body['success'], isTrue);
+        final userId = body['userId'] as String;
+        final accessToken = body['accessToken'] as String;
+        expect(body['refreshToken'], isA<String>());
+        expect(response.headers['set-cookie'], isNull);
+
+        expect(sessionStore.sessions.values, hasLength(1));
+        final session = sessionStore.sessions.values.single;
+        expect(session.userId, userId);
+        expect(session.userAgent, 'Dart/3.11 (dart:io)');
+        expect(session.handle, 'Dart');
+
+        final meResponse = await onRouter.handler(
+          Request(
+            'GET',
+            Uri.parse('http://localhost/auth/me'),
+            headers: {'authorization': 'Bearer $accessToken'},
+          ),
+        );
+        final meBody = _jsonBody(await meResponse.readAsString());
+        expect(meResponse.statusCode, 200);
+        expect(meBody['id'], userId);
+        expect(meBody['email'], 'on-bearer@example.com');
+
+        // Same token field names as the login body.
+        final loginResponse = await onRouter.handler(
+          Request(
+            'POST',
+            Uri.parse('http://localhost/auth/login'),
+            body: jsonEncode({
+              'email': 'on-bearer@example.com',
+              'password': 'SecurePass1!',
+            }),
+            headers: const {'content-type': 'application/json'},
+          ),
+        );
+        final loginBody = _jsonBody(await loginResponse.readAsString());
+        expect(
+          body.keys.toSet().difference({'success', 'userId'}),
+          loginBody.keys.toSet().difference({'user'}),
+        );
+      });
+
+      test('a refused registration issues nothing', () async {
+        await _register(
+          onRouter,
+          email: 'taken@example.com',
+          password: 'SecurePass1!',
+        );
+        expect(sessionStore.sessions.values, hasLength(1));
+
+        final response = await _register(
+          onRouter,
+          email: 'taken@example.com',
+          password: 'SecurePass1!',
+        );
+        final body = _jsonBody(await response.readAsString());
+
+        expect(response.statusCode, 400);
+        expect(body.containsKey('accessToken'), isFalse);
+        expect(body.containsKey('refreshToken'), isFalse);
+        expect(response.headers['set-cookie'], isNull);
+        expect(sessionStore.sessions.values, hasLength(1));
+      });
+
+      test('an onRegister hook that throws issues nothing', () async {
+        final hookRouter = AuthRouter(
+          config: config.copyWith(issueSessionOnRegister: true),
+          authService: service,
+          callbacks: AuthCallbacks(
+            onRegister: (_) async => throw StateError('hook refused'),
+          ),
+        );
+
+        await expectLater(
+          _register(
+            hookRouter,
+            email: 'hook@example.com',
+            password: 'SecurePass1!',
+          ),
+          throwsStateError,
+        );
+        expect(sessionStore.sessions, isEmpty);
+      });
+
+      test('a strict email-verification policy issues nothing', () async {
+        final first = _jsonBody(
+          await (await _register(
+            onRouter,
+            email: 'admin-on@example.com',
+            password: 'SecurePass1!',
+          )).readAsString(),
+        );
+        final settings = await onRouter.handler(
+          Request(
+            'PUT',
+            Uri.parse('http://localhost/auth/admin/api/settings'),
+            headers: {
+              'authorization': 'Bearer ${first['accessToken']}',
+              'content-type': 'application/json',
+            },
+            body: jsonEncode({'emailVerificationMode': 'strict'}),
+          ),
+        );
+        expect(settings.statusCode, 200);
+        expect(sessionStore.sessions.values, hasLength(1));
+
+        final response = await _register(
+          onRouter,
+          email: 'unverified@example.com',
+          password: 'SecurePass1!',
+        );
+        final body = _jsonBody(await response.readAsString());
+
+        expect(response.statusCode, 201);
+        expect(body.keys, unorderedEquals(<String>['success', 'userId']));
+        expect(response.headers['set-cookie'], isNull);
+        expect(sessionStore.sessions.values, hasLength(1));
+      });
+
+      test('an account the login would challenge for 2FA gets no session',
+          () async {
+        final totpRouter = AuthRouter(
+          config: config.copyWith(issueSessionOnRegister: true),
+          authService: service,
+          callbacks: AuthCallbacks(
+            onRegister: (user) async =>
+                userStore.update(user.copyWith(totpEnabled: true)),
+          ),
+        );
+
+        final response = await _register(
+          totpRouter,
+          email: 'totp-on@example.com',
+          password: 'SecurePass1!',
+        );
+        final body = _jsonBody(await response.readAsString());
+
+        expect(response.statusCode, 201);
+        expect(body.keys, unorderedEquals(<String>['success', 'userId']));
+        expect(sessionStore.sessions, isEmpty);
+      });
     });
 
     test('returns 400 when registering duplicate email', () async {
@@ -311,19 +523,12 @@ void main() {
     });
 
     test('refreshes tokens via POST /auth/refresh', () async {
-      final regResponse = await router.handler(
-        Request(
-          'POST',
-          Uri.parse('http://localhost/auth/register'),
-          body: jsonEncode({
-            'email': 'eve@example.com',
-            'password': 'StrongPw1!',
-          }),
-          headers: const {'content-type': 'application/json'},
-        ),
+      final loginBody = await _registerAndLogin(
+        router,
+        email: 'eve@example.com',
+        password: 'StrongPw1!',
       );
-      final regBody = _jsonBody(await regResponse.readAsString());
-      final refreshToken = regBody['refreshToken'] as String;
+      final refreshToken = loginBody['refreshToken'] as String;
 
       final response = await router.handler(
         Request(
@@ -347,19 +552,12 @@ void main() {
     });
 
     test('returns user from GET /auth/me with valid token', () async {
-      final regResponse = await router.handler(
-        Request(
-          'POST',
-          Uri.parse('http://localhost/auth/register'),
-          body: jsonEncode({
-            'email': 'frank@example.com',
-            'password': 'SecretPw1!',
-          }),
-          headers: const {'content-type': 'application/json'},
-        ),
+      final loginBody = await _registerAndLogin(
+        router,
+        email: 'frank@example.com',
+        password: 'SecretPw1!',
       );
-      final regBody = _jsonBody(await regResponse.readAsString());
-      final accessToken = regBody['accessToken'] as String;
+      final accessToken = loginBody['accessToken'] as String;
 
       final meResponse = await router.handler(
         Request(
@@ -375,19 +573,12 @@ void main() {
     });
 
     test('logouts via POST /auth/logout', () async {
-      final regResponse = await router.handler(
-        Request(
-          'POST',
-          Uri.parse('http://localhost/auth/register'),
-          body: jsonEncode({
-            'email': 'grace@example.com',
-            'password': 'Password99!',
-          }),
-          headers: const {'content-type': 'application/json'},
-        ),
+      final loginBody = await _registerAndLogin(
+        router,
+        email: 'grace@example.com',
+        password: 'Password99!',
       );
-      final regBody = _jsonBody(await regResponse.readAsString());
-      final accessToken = regBody['accessToken'] as String;
+      final accessToken = loginBody['accessToken'] as String;
 
       final response = await router.handler(
         Request(
@@ -403,19 +594,12 @@ void main() {
     });
 
     test('TOTP setup returns secret + otpAuthUrl', () async {
-      final regResponse = await router.handler(
-        Request(
-          'POST',
-          Uri.parse('http://localhost/auth/register'),
-          body: jsonEncode({
-            'email': 'henry@example.com',
-            'password': 'SafePw123!',
-          }),
-          headers: const {'content-type': 'application/json'},
-        ),
+      final loginBody = await _registerAndLogin(
+        router,
+        email: 'henry@example.com',
+        password: 'SafePw123!',
       );
-      final regBody = _jsonBody(await regResponse.readAsString());
-      final accessToken = regBody['accessToken'] as String;
+      final accessToken = loginBody['accessToken'] as String;
 
       final setupResponse = await router.handler(
         Request(
@@ -474,19 +658,12 @@ void main() {
     });
 
     test('admin API returns users when authenticated', () async {
-      final registerResponse = await router.handler(
-        Request(
-          'POST',
-          Uri.parse('http://localhost/auth/register'),
-          body: jsonEncode({
-            'email': 'admin-users@example.com',
-            'password': 'StrongPass1!',
-          }),
-          headers: const {'content-type': 'application/json'},
-        ),
+      final loginBody = await _registerAndLogin(
+        router,
+        email: 'admin-users@example.com',
+        password: 'StrongPass1!',
       );
-      final registerBody = _jsonBody(await registerResponse.readAsString());
-      final accessToken = registerBody['accessToken'] as String;
+      final accessToken = loginBody['accessToken'] as String;
 
       final response = await router.handler(
         Request(
@@ -503,19 +680,12 @@ void main() {
     });
 
     test('admin API lists and revokes sessions', () async {
-      final registerResponse = await router.handler(
-        Request(
-          'POST',
-          Uri.parse('http://localhost/auth/register'),
-          body: jsonEncode({
-            'email': 'admin-sessions@example.com',
-            'password': 'StrongPass1!',
-          }),
-          headers: const {'content-type': 'application/json'},
-        ),
+      final loginBody = await _registerAndLogin(
+        router,
+        email: 'admin-sessions@example.com',
+        password: 'StrongPass1!',
       );
-      final registerBody = _jsonBody(await registerResponse.readAsString());
-      final accessToken = registerBody['accessToken'] as String;
+      final accessToken = loginBody['accessToken'] as String;
 
       final listResponse = await router.handler(
         Request(
@@ -544,19 +714,12 @@ void main() {
     });
 
     test('admin API supports settings and templates', () async {
-      final registerResponse = await router.handler(
-        Request(
-          'POST',
-          Uri.parse('http://localhost/auth/register'),
-          body: jsonEncode({
-            'email': 'admin-settings@example.com',
-            'password': 'StrongPass1!',
-          }),
-          headers: const {'content-type': 'application/json'},
-        ),
+      final loginBody = await _registerAndLogin(
+        router,
+        email: 'admin-settings@example.com',
+        password: 'StrongPass1!',
       );
-      final registerBody = _jsonBody(await registerResponse.readAsString());
-      final accessToken = registerBody['accessToken'] as String;
+      final accessToken = loginBody['accessToken'] as String;
 
       final putSettings = await router.handler(
         Request(
@@ -659,14 +822,14 @@ void main() {
         ),
       );
       final registerBody = _jsonBody(await registerResponse.readAsString());
-      final user = registerBody['user'] as Map<String, dynamic>;
+      final userId = registerBody['userId'] as String;
 
       await tokenStore.save(
         TokenRecord(
           token: 'reset-token',
           purpose: 'password_reset',
-          userId: user['id'] as String,
-          email: user['email'] as String,
+          userId: userId,
+          email: 'reset-user@example.com',
           createdAt: DateTime.now().toUtc(),
           expiresAt: DateTime.now().toUtc().add(const Duration(hours: 1)),
         ),
@@ -712,8 +875,7 @@ void main() {
         ),
       );
       final registerBody = _jsonBody(await registerResponse.readAsString());
-      final user = registerBody['user'] as Map<String, dynamic>;
-      final userId = user['id'] as String;
+      final userId = registerBody['userId'] as String;
 
       await tokenStore.save(
         TokenRecord(
@@ -752,8 +914,7 @@ void main() {
         ),
       );
       final registerBody = _jsonBody(await registerResponse.readAsString());
-      final user = registerBody['user'] as Map<String, dynamic>;
-      final userId = user['id'] as String;
+      final userId = registerBody['userId'] as String;
 
       await tokenStore.save(
         TokenRecord(

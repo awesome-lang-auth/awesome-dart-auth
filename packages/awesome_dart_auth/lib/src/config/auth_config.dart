@@ -48,6 +48,7 @@ class AuthConfig {
     this.cookieSameSite = 'lax',
     this.cookiePrefix,
     this.uiConfig = const <String, Object?>{},
+    this.issueSessionOnRegister = false,
   }) {
     _validate();
   }
@@ -178,6 +179,17 @@ class AuthConfig {
   /// Static configuration map surfaced by the `GET /auth/ui/config` endpoint.
   final Map<String, Object?> uiConfig;
 
+  /// Whether `POST /register` also opens a session for the new account.
+  ///
+  /// Off (the default, the family reference's behaviour): register answers
+  /// `201 {"success": true, "userId": "<id>"}` and issues nothing; the client
+  /// calls `POST /login` afterwards. On: the same `201` body plus the
+  /// `accessToken` / `refreshToken` fields a successful login returns, with
+  /// the refresh session created the way login creates it. Nothing is issued
+  /// when the registration is refused, or when the email-verification policy
+  /// is `strict`.
+  final bool issueSessionOnRegister;
+
   /// Returns a copy of this configuration with updated fields.
   AuthConfig copyWith({
     String? jwtSecret,
@@ -211,6 +223,7 @@ class AuthConfig {
     String? cookieSameSite,
     Object? cookiePrefix = _sentinel,
     Map<String, Object?>? uiConfig,
+    bool? issueSessionOnRegister,
   }) {
     return AuthConfig(
       jwtSecret: jwtSecret ?? this.jwtSecret,
@@ -247,6 +260,8 @@ class AuthConfig {
           ? this.cookiePrefix
           : cookiePrefix as String?,
       uiConfig: uiConfig ?? this.uiConfig,
+      issueSessionOnRegister:
+          issueSessionOnRegister ?? this.issueSessionOnRegister,
     );
   }
 
