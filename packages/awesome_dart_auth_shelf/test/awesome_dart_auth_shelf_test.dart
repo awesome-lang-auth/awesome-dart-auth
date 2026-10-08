@@ -52,5 +52,7 @@ void main() {
     );
 
     expect(response.statusCode, 200);
+    expect(response.headers['content-type'], startsWith('text/html'));
+    expect(await response.readAsString(), isNot('downstream'));
   });
 }
