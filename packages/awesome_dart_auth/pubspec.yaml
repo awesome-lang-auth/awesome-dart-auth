@@ -5,6 +5,7 @@ repository: https://github.com/awesome-lang-auth/awesome-dart-auth
 
 environment:
   sdk: ^3.11.0
+resolution: workspace
 
 dependencies:
   bcrypt: ^1.1.3

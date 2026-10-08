@@ -3,6 +3,20 @@ publish_to: none
 environment:
   sdk: ^3.11.0
 
+# Pub workspace: melos 7 discovers packages from this list, not from a
+# melos.yaml. Every member pubspec declares `resolution: workspace`.
+workspace:
+  - packages/awesome_dart_auth
+  - packages/awesome_dart_auth_dart_frog
+  - packages/awesome_dart_auth_shelf
+  - examples/dart_frog_postgres
+  - examples/shelf_mongodb
+
 dev_dependencies:
   melos: ^7.0.0
   very_good_analysis: ^9.0.0
+
+melos:
+  scripts:
+    analyze: melos exec --fail-fast -- dart analyze .
+    test: melos exec --fail-fast --dir-exists=test -- dart test

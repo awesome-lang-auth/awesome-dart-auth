@@ -27,6 +27,16 @@ jobs:
           dart pub get
           dart run melos bootstrap
 
+      - name: Check that melos sees every package
+        run: |
+          dart run melos list --parsable | tee /tmp/melos-packages.txt
+          count=$(grep -cE '/(packages|examples)/' /tmp/melos-packages.txt || true)
+          echo "melos packages: $count"
+          if [ "$count" -lt 5 ]; then
+            echo '::error::melos found fewer than 5 packages; analyze and test would run on nothing'
+            exit 1
+          fi
+
       - name: Analyze
         run: dart run melos exec --fail-fast -- dart analyze .
 
