@@ -34,7 +34,7 @@ Map<String, Object?> buildOpenApiDocument(AuthConfig config) => {
       'get': {'summary': 'Serve the embedded auth stylesheet'},
     },
     '${config.apiBasePath}/ui/config': {
-      'get': {'summary': 'Return static UI configuration'},
+      'get': {'summary': 'Return the UI configuration document'},
     },
     // ── OIDC / JWKS ───────────────────────────────────────────────────────
     if (config.enableIdpMode) ...{
