@@ -23,8 +23,8 @@ class AuthConfig {
     this.accessTokenTtl = const Duration(minutes: 15),
     this.refreshTokenTtl = const Duration(days: 30),
     this.adminUiPath = '/auth/admin',
-    this.authUiPath = '/auth/ui',
-    this.authJsPath = '/auth/ui/auth.js',
+    String? authUiPath,
+    String? authJsPath,
     this.openApiPath = '/auth/openapi.json',
     this.discoveryPath = '/auth/.well-known/openid-configuration',
     this.authorizationPath = '/auth/authorize',
@@ -48,7 +48,8 @@ class AuthConfig {
     this.cookieSameSite = 'lax',
     this.cookiePrefix,
     this.uiConfig = const <String, Object?>{},
-  }) {
+  }) : _authUiPath = authUiPath,
+       _authJsPath = authJsPath {
     _validate();
   }
 
@@ -103,11 +104,31 @@ class AuthConfig {
   /// Path that serves the embedded admin UI.
   final String adminUiPath;
 
-  /// Path that serves the embedded auth UI.
-  final String authUiPath;
+  /// Path that serves the embedded auth UI pages.
+  ///
+  /// Defaults to `<apiBasePath>/ui`, so changing [apiBasePath] alone moves
+  /// the pages, [authJsPath], `<apiBasePath>/ui/base.css` and
+  /// `<apiBasePath>/ui/config` together, as awesome-node-auth does with its
+  /// mount prefix.
+  ///
+  /// An explicit value is an escape hatch. The login page loads `base.css`
+  /// and `auth.js` relative to itself, and `auth.js` takes the part of the
+  /// page path before `/ui/` as the API prefix, so the built-in pages only
+  /// work unchanged when this is `<apiBasePath>/ui`.
+  String get authUiPath => _authUiPath ?? '$apiBasePath/ui';
 
-  /// Path that serves the embedded browser SDK.
-  final String authJsPath;
+  /// Path that serves the embedded browser SDK (`auth.js`).
+  ///
+  /// Defaults to `<authUiPath>/auth.js`, which is `<apiBasePath>/ui/auth.js`
+  /// unless [authUiPath] is set explicitly. It is served whenever the router
+  /// is mounted, even with [enableAuthUi] off.
+  String get authJsPath => _authJsPath ?? '$authUiPath/auth.js';
+
+  /// The [authUiPath] passed to the constructor, if any.
+  final String? _authUiPath;
+
+  /// The [authJsPath] passed to the constructor, if any.
+  final String? _authJsPath;
 
   /// Path that serves the generated OpenAPI specification.
   final String openApiPath;
@@ -127,7 +148,11 @@ class AuthConfig {
   /// JWKS endpoint path.
   final String jwksPath;
 
-  /// Base path for the auth surface.
+  /// Base path for the auth surface (default `/auth`).
+  ///
+  /// The API routes, `<apiBasePath>/ui/config`, `<apiBasePath>/ui/base.css`
+  /// and, unless they are set explicitly, [authUiPath] and [authJsPath] are
+  /// all under it.
   final String apiBasePath;
 
   /// Built-in locale used when the requested locale is unavailable.
@@ -175,7 +200,15 @@ class AuthConfig {
   /// Optional cookie name prefix (`__Host-` or `__Secure-`).
   final String? cookiePrefix;
 
-  /// Static configuration map surfaced by the `GET /auth/ui/config` endpoint.
+  /// Entries merged into the document served at `GET <apiBasePath>/ui/config`.
+  ///
+  /// The router always serves awesome-node-auth's document shape: `apiPrefix`,
+  /// `features`, `ui`, `translations`, `lang` and `headless`. Each entry here
+  /// replaces the top-level key of the same name, except that a map given for
+  /// a key whose default is a map (`features`, `ui`, `translations`) is merged
+  /// into it, so `{'ui': {'siteName': 'ACME'}}` keeps the default colors.
+  /// Keys the reference does not know are added as they are. The default,
+  /// an empty map, serves the document unchanged.
   final Map<String, Object?> uiConfig;
 
   /// Returns a copy of this configuration with updated fields.
@@ -219,8 +252,10 @@ class AuthConfig {
       accessTokenTtl: accessTokenTtl ?? this.accessTokenTtl,
       refreshTokenTtl: refreshTokenTtl ?? this.refreshTokenTtl,
       adminUiPath: adminUiPath ?? this.adminUiPath,
-      authUiPath: authUiPath ?? this.authUiPath,
-      authJsPath: authJsPath ?? this.authJsPath,
+      // The overrides, not the derived getters, so that a copy with a new
+      // apiBasePath derives its UI paths from it again.
+      authUiPath: authUiPath ?? _authUiPath,
+      authJsPath: authJsPath ?? _authJsPath,
       openApiPath: openApiPath ?? this.openApiPath,
       discoveryPath: discoveryPath ?? this.discoveryPath,
       authorizationPath: authorizationPath ?? this.authorizationPath,
