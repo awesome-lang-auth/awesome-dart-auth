@@ -7,11 +7,11 @@
 **Server-side authentication library for Dart backends** (Shelf / Dart Frog) that replicates the [awesome-node-auth](https://github.com/awesome-lang-auth/awesome-node-auth) Node.js backend in Dart.
 
 > **Important:** `awesome-dart-auth` is a server-side package.  
-> Flutter client support continues through the existing [`awesome-node-auth-flutter`](https://github.com/awesome-lang-auth/awesome-flutter-auth) client package.
+> Flutter client support continues through the existing [`awesome_flutter_auth`](https://github.com/awesome-lang-auth/awesome-flutter-auth) client package.
 
 Fully compatible with:
-- **[ng-awesome-node-auth](https://github.com/awesome-lang-auth/awesome-angular-auth)** — Angular client library
-- **[awesome-node-auth-flutter](https://github.com/awesome-lang-auth/awesome-flutter-auth)** — Flutter/Dart client library
+- **[@awesome-lang-auth/angular](https://github.com/awesome-lang-auth/awesome-angular-auth)** — Angular client library
+- **[awesome_flutter_auth](https://github.com/awesome-lang-auth/awesome-flutter-auth)** — Flutter/Dart client library
 
 Supports **both authentication strategies** used by those clients:
 
@@ -375,7 +375,7 @@ Standard event types emitted by `AuthService`:
 
 ```typescript
 // app.config.ts
-import { provideAuth } from 'ng-awesome-node-auth';
+import { provideAuth } from '@awesome-lang-auth/angular';
 
 export const appConfig: ApplicationConfig = {
   providers: [
