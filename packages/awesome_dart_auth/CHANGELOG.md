@@ -1,9 +1,12 @@
 ## Unreleased
 
 - `authUiPath` and `authJsPath` default to `<apiBasePath>/ui` and
-  `<authUiPath>/auth.js`, so setting `apiBasePath` alone moves `auth.js`,
+  `<apiBasePath>/ui/auth.js`, so setting `apiBasePath` alone moves `auth.js`,
   `/ui/config`, `base.css` and the login page together. Explicit values still
-  win, and `copyWith(apiBasePath: ...)` derives the paths again.
+  win, an explicit `authUiPath` moves only the pages, and
+  `copyWith(apiBasePath: ...)` derives the paths again. If you set
+  `apiBasePath` and load `/auth/ui/auth.js`, change the `<script src>` to
+  `<apiBasePath>/ui/auth.js`: the old URL now answers 404.
 - `GET <apiBasePath>/ui/config` serves awesome-node-auth's document shape
   (`apiPrefix`, `features`, `ui`, `translations`, `lang`, `headless`) instead
   of `{}`. With nothing configured it is byte-identical to node's. `uiConfig`

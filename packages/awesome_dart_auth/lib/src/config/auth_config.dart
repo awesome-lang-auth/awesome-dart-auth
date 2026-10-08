@@ -111,18 +111,19 @@ class AuthConfig {
   /// `<apiBasePath>/ui/config` together, as awesome-node-auth does with its
   /// mount prefix.
   ///
-  /// An explicit value is an escape hatch. The login page loads `base.css`
-  /// and `auth.js` relative to itself, and `auth.js` takes the part of the
-  /// page path before `/ui/` as the API prefix, so the built-in pages only
-  /// work unchanged when this is `<apiBasePath>/ui`.
+  /// An explicit value moves only the pages; [authJsPath] stays at
+  /// `<apiBasePath>/ui/auth.js`. It is an escape hatch: the login page loads
+  /// `base.css` and `auth.js` relative to itself, and `auth.js` takes the
+  /// part of the page path before `/ui/` as the API prefix, so the built-in
+  /// pages only work unchanged when this is `<apiBasePath>/ui`.
   String get authUiPath => _authUiPath ?? '$apiBasePath/ui';
 
   /// Path that serves the embedded browser SDK (`auth.js`).
   ///
-  /// Defaults to `<authUiPath>/auth.js`, which is `<apiBasePath>/ui/auth.js`
-  /// unless [authUiPath] is set explicitly. It is served whenever the router
-  /// is mounted, even with [enableAuthUi] off.
-  String get authJsPath => _authJsPath ?? '$authUiPath/auth.js';
+  /// Defaults to `<apiBasePath>/ui/auth.js`, awesome-node-auth's route, and
+  /// only [apiBasePath] moves it: an explicit [authUiPath] does not. It is
+  /// served whenever the router is mounted, even with [enableAuthUi] off.
+  String get authJsPath => _authJsPath ?? '$apiBasePath/ui/auth.js';
 
   /// The [authUiPath] passed to the constructor, if any.
   final String? _authUiPath;
@@ -151,7 +152,7 @@ class AuthConfig {
   /// Base path for the auth surface (default `/auth`).
   ///
   /// The API routes, `<apiBasePath>/ui/config`, `<apiBasePath>/ui/base.css`
-  /// and, unless they are set explicitly, [authUiPath] and [authJsPath] are
+  /// and, unless each is set explicitly, [authUiPath] and [authJsPath] are
   /// all under it.
   final String apiBasePath;
 
