@@ -37,7 +37,7 @@ Supports **both authentication strategies** used by those clients:
 | RBAC | ✅ Implemented | `RolesPermissionsStore` with role-enriched JWT claims. |
 | Multi-tenancy | ✅ Implemented | `TenantStore` contract and `tenantId` propagation through models and tokens. |
 | Admin panel | ✅ Implemented | Embedded admin UI + admin API routes are available under `/auth/admin` and `/auth/admin/api/*` (store-driven, with optional capabilities enabled based on configured stores). |
-| Built-in UI + auth runtime (`auth.js`) | ✅ Implemented | Upstream login UI + `auth.js` + `base.css` assets are served at `/auth/ui/login`, `/auth/ui/auth.js`, `/auth/ui/base.css` (`/auth/ui` redirects to `/auth/ui/login`). |
+| Built-in UI + auth runtime (`auth.js`) | ✅ Implemented | `auth.js` (byte-identical to the reference) and the node-shaped `/auth/ui/config` are served at `/auth/ui/auth.js` and `/auth/ui/config` whenever the router is mounted. The upstream login page and `base.css` are served at `/auth/ui/login` and `/auth/ui/base.css` (`/auth/ui` redirects to `/auth/ui/login`) unless `enableAuthUi` is `false`, which is the reference's headless mode: pages 404, `auth.js` 200, `headless: true` in the config. Changing `apiBasePath` moves all of them. |
 | Client libraries compatibility (Angular + Flutter) | ✅ Implemented | Cookie+CSRF (web) and bearer (native) strategies are both supported. |
 | Event-driven tooling (event bus, SSE, inbound/outbound webhooks, telemetry, notify channels) | ✅ Implemented | `AuthTools`, `AuthEventBus`, `SseDistributor`, webhook signing, outgoing webhook dispatch (`WebhookStore` + `WebhookSender`), and multi-channel `notify()`. |
 | API keys (M2M) | ✅ Implemented | `ApiKeyStore` contract and `ApiKeyRecord` model available. |
@@ -126,7 +126,8 @@ final config = AuthConfig(
   cookieSecure: true,                // Set false for local HTTP
   cookieSameSite: 'lax',
   cookiePrefix: '__Host-',           // Optional: __Host- or __Secure-
-  uiConfig: {'theme': 'dark'},       // Returned by GET /auth/ui/config
+  apiBasePath: '/auth',              // Moves the auth API routes, auth.js, /ui/config and the UI pages
+  uiConfig: {'ui': {'siteName': 'ACME'}}, // Merged into GET /auth/ui/config
   enableIdpMode: true,               // Expose OIDC discovery, JWKS, userinfo, token
   oauthProviders: {'google', 'github'},
 );
@@ -229,11 +230,11 @@ All endpoints are mounted under `apiBasePath` (default: `/auth`).
 ### Utilities / UI
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/ui/config` | UI configuration (theme, branding) |
-| `GET` | `/ui` | Redirects to `/ui/login` |
-| `GET` | `/ui/login` | Embedded upstream login UI |
-| `GET` | `/ui/base.css` | Embedded upstream auth stylesheet |
-| `GET` | `/ui/auth.js` | Embedded browser SDK |
+| `GET` | `/ui/config` | UI configuration with the reference's shape (`apiPrefix`, `features`, `ui` branding, `translations`, `lang`, `headless`); `uiConfig` is merged into it |
+| `GET` | `/ui` | Redirects to `/ui/login` (404 when `enableAuthUi` is `false`) |
+| `GET` | `/ui/login` | Embedded upstream login UI (404 when `enableAuthUi` is `false`) |
+| `GET` | `/ui/base.css` | Embedded upstream auth stylesheet (404 when `enableAuthUi` is `false`) |
+| `GET` | `/ui/auth.js` | Embedded browser SDK, always served |
 | `GET` | `/admin` | Embedded admin UI |
 | `GET` | `/admin/assets/admin.css` | Embedded admin stylesheet |
 | `GET` | `/admin/assets/admin.js` | Embedded admin runtime |
