@@ -51,15 +51,18 @@ void main() {
         expect(config.authJsPath, '/static/auth.js');
       });
 
-      test('authJsPath follows an explicit authUiPath', () {
+      test('an explicit authUiPath leaves authJsPath under apiBasePath', () {
         final config = AuthConfig(
           jwtSecret: 'secret1234',
           issuer: 'https://auth.example.com',
           authUiPath: '/login-ui',
         );
+        final moved = config.copyWith(apiBasePath: '/api/auth');
 
         expect(config.authUiPath, '/login-ui');
-        expect(config.authJsPath, '/login-ui/auth.js');
+        expect(config.authJsPath, '/auth/ui/auth.js');
+        expect(moved.authUiPath, '/login-ui');
+        expect(moved.authJsPath, '/api/auth/ui/auth.js');
       });
 
       test('copyWith(apiBasePath:) derives them again', () {

@@ -126,7 +126,7 @@ final config = AuthConfig(
   cookieSecure: true,                // Set false for local HTTP
   cookieSameSite: 'lax',
   cookiePrefix: '__Host-',           // Optional: __Host- or __Secure-
-  apiBasePath: '/auth',              // Moves the API, auth.js, /ui/config and the UI pages
+  apiBasePath: '/auth',              // Moves the auth API routes, auth.js, /ui/config and the UI pages
   uiConfig: {'ui': {'siteName': 'ACME'}}, // Merged into GET /auth/ui/config
   enableIdpMode: true,               // Expose OIDC discovery, JWKS, userinfo, token
   oauthProviders: {'google', 'github'},

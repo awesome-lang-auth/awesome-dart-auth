@@ -138,6 +138,10 @@ Map<String, dynamic> _jsonBody(String body) =>
 Future<Response> _get(AuthRouter router, String path) async =>
     router.handler(Request('GET', Uri.parse('http://localhost$path')));
 
+Future<String> _sha256Of(Response response) async => sha256
+    .convert(await response.read().expand((chunk) => chunk).toList())
+    .toString();
+
 /// awesome-node-auth 1.10.8 `src/ui/assets/auth.js`, the bytes every port
 /// serves.
 const _referenceAuthJsLength = 31277;
@@ -544,6 +548,20 @@ void main() {
         expect((await _get(custom, '/auth/ui/auth.js')).statusCode, 404);
         expect((await _get(custom, '/auth/ui/login')).statusCode, 404);
         expect((await _get(custom, '/auth/ui/config')).statusCode, 200);
+      });
+
+      test('moving only authUiPath keeps auth.js at /auth/ui', () async {
+        final pagesMoved = AuthRouter(
+          config: config.copyWith(authUiPath: '/login-ui'),
+          authService: service,
+        );
+
+        final js = await _get(pagesMoved, '/auth/ui/auth.js');
+        expect(js.statusCode, 200);
+        expect(await _sha256Of(js), _referenceAuthJsSha256);
+        expect((await _get(pagesMoved, '/auth/ui/config')).statusCode, 200);
+        expect((await _get(pagesMoved, '/login-ui/login')).statusCode, 200);
+        expect((await _get(pagesMoved, '/auth/ui/login')).statusCode, 404);
       });
 
       test('enableAuthUi false is headless: auth.js 200, pages 404', () async {
