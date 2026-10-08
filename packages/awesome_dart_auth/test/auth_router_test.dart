@@ -500,7 +500,7 @@ void main() {
         expect(await response.readAsString(), _referenceDefaultUiConfig);
       });
 
-      test('apiBasePath alone moves auth.js, the pages and /ui/config', () async {
+      test('apiBasePath alone moves auth.js, pages and /ui/config', () async {
         final moved = AuthRouter(
           config: config.copyWith(apiBasePath: '/api/auth'),
           authService: service,
@@ -508,7 +508,7 @@ void main() {
 
         final js = await _get(moved, '/api/auth/ui/auth.js');
         expect(js.statusCode, 200);
-        expect(await js.readAsString(), embeddedAuthJs);
+        expect(await _sha256Of(js), _referenceAuthJsSha256);
 
         final ui = await _get(moved, '/api/auth/ui');
         expect(ui.statusCode, 302);
@@ -589,6 +589,10 @@ void main() {
               'ui': {'siteName': 'ACME'},
               'features': {'register': true},
               'theme': 'dark',
+              // Scalars replace the defaults, e.g. a public prefix behind a
+              // path-rewriting proxy.
+              'apiPrefix': '/edge/auth',
+              'headless': true,
             },
           ),
           authService: service,
@@ -600,7 +604,9 @@ void main() {
         final ui = body['ui'] as Map<String, dynamic>;
         final features = body['features'] as Map<String, dynamic>;
 
-        expect(body['apiPrefix'], '/auth');
+        expect(body['apiPrefix'], '/edge/auth');
+        expect(body['headless'], isTrue);
+        expect(body['lang'], 'en');
         expect(body['theme'], 'dark');
         expect(ui['siteName'], 'ACME');
         expect(ui['primaryColor'], '#4a90d9');
