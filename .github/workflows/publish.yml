@@ -31,9 +31,12 @@ jobs:
         run: |
           dart run melos list --parsable | tee /tmp/melos-packages.txt
           count=$(grep -cE '/(packages|examples)/' /tmp/melos-packages.txt || true)
-          echo "melos packages: $count"
-          if [ "$count" -lt 5 ]; then
-            echo '::error::melos found fewer than 5 packages; analyze and test would run on nothing'
+          expected=$(git ls-files 'packages/*/pubspec.yaml' 'examples/*/pubspec.yaml' | wc -l)
+          echo "melos packages: $count, tracked package pubspecs: $expected"
+          if [ "$expected" -gt 0 ] && [ "$count" -eq "$expected" ]; then
+            echo 'melos sees every package under packages/ and examples/'
+          else
+            echo '::error::melos does not see every package under packages/ and examples/; list each one under workspace: in the root pubspec.yaml'
             exit 1
           fi
 
