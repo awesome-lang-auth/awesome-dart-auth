@@ -1399,7 +1399,7 @@ class AuthRouter {
       if (claims['typ'] != 'access') return null;
       final userId = claims['sub'] as String?;
       if (userId == null) return null;
-      return authService.userStore.findById(userId);
+      return await authService.userStore.findById(userId);
     } on JWTException {
       return null;
     }
