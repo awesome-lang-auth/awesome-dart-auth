@@ -153,7 +153,10 @@ class AuthRouter {
           headers: const {'content-type': 'text/css; charset=utf-8'},
         );
       })
-      ..get('${config.apiBasePath}/ui/config', (_) => _ok(config.uiConfig))
+      ..get(
+        '${config.apiBasePath}/ui/config',
+        (Request request) => _ok(_buildUiConfig(request)),
+      )
       ..get(config.openApiPath, (_) => _ok(buildOpenApiDocument(config)))
       ..get(config.discoveryPath, (_) {
         if (!config.enableIdpMode) {
@@ -1469,6 +1472,65 @@ class AuthRouter {
       'window.__ADMIN_CONFIG__ = ${jsonEncode(adminConfig)};',
     );
   }
+
+  /// The document served at `GET <apiBasePath>/ui/config`.
+  ///
+  /// It has the shape of awesome-node-auth's (`ui.router.ts`, `getUiConfig`
+  /// plus `headless`), in the same key order, and with nothing configured it
+  /// is byte-for-byte what node serves with nothing configured.
+  /// [AuthConfig.uiConfig] is merged over it.
+  Map<String, Object?> _buildUiConfig(Request request) {
+    final queryLang = request.url.queryParameters['lang'];
+    final document = <String, Object?>{
+      'apiPrefix': config.apiBasePath,
+      // A flag unhides a link or button on the login page. Only google and
+      // github are derived from the wiring: their buttons lead to
+      // <apiBasePath>/oauth/<provider>, which this router serves. The others
+      // stay false, node's answer when nothing is configured, because the
+      // pages they link to (register, forgot-password, ...) are not embedded
+      // here and would answer 404. Set them through uiConfig.
+      'features': <String, Object?>{
+        'register': false,
+        'magicLink': false,
+        'sms': false,
+        'google': _oauthOffered('google'),
+        'github': _oauthOffered('github'),
+        'forgotPassword': false,
+        'verifyEmail': false,
+        'twoFactor': false,
+      },
+      // node's branding defaults. The clients render siteName as the page
+      // heading, so they are wire values, not a claim about the server.
+      'ui': <String, Object?>{
+        'primaryColor': '#4a90d9',
+        'secondaryColor': '#6c757d',
+        'siteName': 'Awesome Node Auth',
+      },
+      'translations': <String, Object?>{},
+      'lang': queryLang == null || queryLang.isEmpty
+          ? config.defaultLocale
+          : queryLang,
+      // node's headless mode: auth.js is served, the pages are not, and
+      // auth.js must not redirect to a login page that answers 404.
+      'headless': !config.enableAuthUi,
+    };
+    for (final MapEntry(:key, :value) in config.uiConfig.entries) {
+      final current = document[key];
+      if (current is Map<String, Object?> && value is Map) {
+        document[key] = <String, Object?>{
+          ...current,
+          ...value.cast<String, Object?>(),
+        };
+      } else {
+        document[key] = value;
+      }
+    }
+    return document;
+  }
+
+  bool _oauthOffered(String provider) =>
+      callbacks.onOAuthStart != null &&
+      config.oauthProviders.contains(provider);
 
   String _sixDigitOtp() {
     final n = Random.secure().nextInt(1000000);

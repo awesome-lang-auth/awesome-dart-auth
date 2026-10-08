@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:awesome_dart_auth/awesome_dart_auth.dart';
+import 'package:crypto/crypto.dart';
 import 'package:shelf/shelf.dart';
 import 'package:test/test.dart';
 
@@ -133,6 +134,25 @@ class _TokenStore implements TokenStore {
 
 Map<String, dynamic> _jsonBody(String body) =>
     jsonDecode(body) as Map<String, dynamic>;
+
+Future<Response> _get(AuthRouter router, String path) async =>
+    router.handler(Request('GET', Uri.parse('http://localhost$path')));
+
+/// awesome-node-auth 1.10.8 `src/ui/assets/auth.js`, the bytes every port
+/// serves.
+const _referenceAuthJsLength = 31277;
+const _referenceAuthJsSha256 =
+    'ccc707ae777d5625150dca819bd7d1d15ade0db439e7329011d312e231d6698f';
+
+/// What awesome-node-auth 1.10.8 answers at `GET /auth/ui/config` with
+/// `ui.enabled` and nothing else configured.
+final String _referenceDefaultUiConfig = [
+  '{"apiPrefix":"/auth","features":{"register":false,"magicLink":false,',
+  '"sms":false,"google":false,"github":false,"forgotPassword":false,',
+  '"verifyEmail":false,"twoFactor":false},"ui":{"primaryColor":"#4a90d9",',
+  '"secondaryColor":"#6c757d","siteName":"Awesome Node Auth"},',
+  '"translations":{},"lang":"en","headless":false}',
+].join();
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -449,6 +469,158 @@ void main() {
 
       expect(response.statusCode, 200);
       expect(body['theme'], 'dark');
+    });
+
+    group('auth.js and /ui/config', () {
+      test('auth.js is byte-identical to awesome-node-auth 1.10.8', () async {
+        final response = await _get(router, '/auth/ui/auth.js');
+        final bytes = await response.read().expand((chunk) => chunk).toList();
+
+        expect(response.statusCode, 200);
+        expect(
+          response.headers['content-type'],
+          'application/javascript; charset=utf-8',
+        );
+        expect(bytes, hasLength(_referenceAuthJsLength));
+        expect(sha256.convert(bytes).toString(), _referenceAuthJsSha256);
+      });
+
+      test('default /auth/ui/config is what node serves by default', () async {
+        final response = await _get(router, '/auth/ui/config');
+
+        expect(response.statusCode, 200);
+        expect(
+          response.headers['content-type'],
+          'application/json; charset=utf-8',
+        );
+        expect(await response.readAsString(), _referenceDefaultUiConfig);
+      });
+
+      test('apiBasePath alone moves auth.js, the pages and /ui/config', () async {
+        final moved = AuthRouter(
+          config: config.copyWith(apiBasePath: '/api/auth'),
+          authService: service,
+        );
+
+        final js = await _get(moved, '/api/auth/ui/auth.js');
+        expect(js.statusCode, 200);
+        expect(await js.readAsString(), embeddedAuthJs);
+
+        final ui = await _get(moved, '/api/auth/ui');
+        expect(ui.statusCode, 302);
+        expect(ui.headers['location'], '/api/auth/ui/login');
+        expect((await _get(moved, '/api/auth/ui/login')).statusCode, 200);
+        expect((await _get(moved, '/api/auth/ui/base.css')).statusCode, 200);
+
+        final uiConfig = await _get(moved, '/api/auth/ui/config');
+        expect(uiConfig.statusCode, 200);
+        expect(
+          _jsonBody(await uiConfig.readAsString())['apiPrefix'],
+          '/api/auth',
+        );
+
+        for (final old in const [
+          '/auth/ui',
+          '/auth/ui/auth.js',
+          '/auth/ui/login',
+          '/auth/ui/base.css',
+          '/auth/ui/config',
+        ]) {
+          expect((await _get(moved, old)).statusCode, 404, reason: old);
+        }
+      });
+
+      test('explicit authUiPath and authJsPath still win', () async {
+        final custom = AuthRouter(
+          config: config.copyWith(
+            authUiPath: '/login-ui',
+            authJsPath: '/static/auth.js',
+          ),
+          authService: service,
+        );
+
+        expect((await _get(custom, '/static/auth.js')).statusCode, 200);
+        expect((await _get(custom, '/login-ui/login')).statusCode, 200);
+        expect((await _get(custom, '/auth/ui/auth.js')).statusCode, 404);
+        expect((await _get(custom, '/auth/ui/login')).statusCode, 404);
+        expect((await _get(custom, '/auth/ui/config')).statusCode, 200);
+      });
+
+      test('enableAuthUi false is headless: auth.js 200, pages 404', () async {
+        final headless = AuthRouter(
+          config: config.copyWith(enableAuthUi: false),
+          authService: service,
+        );
+
+        expect((await _get(headless, '/auth/ui/auth.js')).statusCode, 200);
+        expect((await _get(headless, '/auth/ui')).statusCode, 404);
+        expect((await _get(headless, '/auth/ui/login')).statusCode, 404);
+        expect((await _get(headless, '/auth/ui/base.css')).statusCode, 404);
+
+        final uiConfig = await _get(headless, '/auth/ui/config');
+        expect(uiConfig.statusCode, 200);
+        final body = _jsonBody(await uiConfig.readAsString());
+        expect(body['headless'], isTrue);
+        expect(body['apiPrefix'], '/auth');
+      });
+
+      test('uiConfig is merged into the document', () async {
+        final branded = AuthRouter(
+          config: config.copyWith(
+            uiConfig: {
+              'ui': {'siteName': 'ACME'},
+              'features': {'register': true},
+              'theme': 'dark',
+            },
+          ),
+          authService: service,
+        );
+
+        final body = _jsonBody(
+          await (await _get(branded, '/auth/ui/config')).readAsString(),
+        );
+        final ui = body['ui'] as Map<String, dynamic>;
+        final features = body['features'] as Map<String, dynamic>;
+
+        expect(body['apiPrefix'], '/auth');
+        expect(body['theme'], 'dark');
+        expect(ui['siteName'], 'ACME');
+        expect(ui['primaryColor'], '#4a90d9');
+        expect(features['register'], isTrue);
+        expect(features['google'], isFalse);
+        expect(features, hasLength(8));
+      });
+
+      test('lang follows ?lang= and falls back to defaultLocale', () async {
+        final it = _jsonBody(
+          await (await _get(router, '/auth/ui/config?lang=it')).readAsString(),
+        );
+        final empty = _jsonBody(
+          await (await _get(router, '/auth/ui/config?lang=')).readAsString(),
+        );
+
+        expect(it['lang'], 'it');
+        expect(empty['lang'], 'en');
+      });
+
+      test('google and github follow the OAuth wiring', () async {
+        final oauth = AuthRouter(
+          config: config.copyWith(oauthProviders: const {'google'}),
+          authService: service,
+          callbacks: AuthCallbacks(
+            onOAuthStart: (provider, redirectUri) async =>
+                'https://idp.example.com/$provider',
+          ),
+        );
+
+        final body = _jsonBody(
+          await (await _get(oauth, '/auth/ui/config')).readAsString(),
+        );
+        final features = body['features'] as Map<String, dynamic>;
+
+        expect(features['google'], isTrue);
+        expect(features['github'], isFalse);
+      });
     });
 
     test('serves upstream admin UI assets', () async {
