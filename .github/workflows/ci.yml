@@ -45,3 +45,7 @@ jobs:
 
       - name: Test
         run: dart run melos exec --fail-fast --dir-exists=test -- dart test
+
+      - name: Check that awesome_dart_auth can be published
+        working-directory: packages/awesome_dart_auth
+        run: dart pub publish --dry-run
