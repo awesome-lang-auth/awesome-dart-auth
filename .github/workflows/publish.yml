@@ -27,6 +27,19 @@ jobs:
           dart pub get
           dart run melos bootstrap
 
+      - name: Check that melos sees every package
+        run: |
+          dart run melos list --parsable | tee /tmp/melos-packages.txt
+          count=$(grep -cE '/(packages|examples)/' /tmp/melos-packages.txt || true)
+          expected=$(git ls-files 'packages/*/pubspec.yaml' 'examples/*/pubspec.yaml' | wc -l)
+          echo "melos packages: $count, tracked package pubspecs: $expected"
+          if [ "$expected" -gt 0 ] && [ "$count" -eq "$expected" ]; then
+            echo 'melos sees every package under packages/ and examples/'
+          else
+            echo '::error::melos does not see every package under packages/ and examples/; list each one under workspace: in the root pubspec.yaml'
+            exit 1
+          fi
+
       - name: Run checks before publishing
         run: |
           dart run melos exec --fail-fast -- dart analyze .

@@ -20,6 +20,8 @@ packages/   Core package and framework adapters
 examples/   Integration examples
 ```
 
+Every package and example is a member of the pub workspace declared in the root `pubspec.yaml`. A new one must be added to its `workspace:` list and declare `resolution: workspace` in its own `pubspec.yaml`; CI fails when melos does not see every `pubspec.yaml` under `packages/` and `examples/`.
+
 ## How to contribute
 
 1. **Fork** the repository and create a branch from `main`.

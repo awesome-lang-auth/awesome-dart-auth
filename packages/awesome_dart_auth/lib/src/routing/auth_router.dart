@@ -1149,7 +1149,7 @@ class AuthRouter {
                   'userId': s.userId,
                   'ipAddress': s.ipAddress,
                   'userAgent': s.userAgent,
-                  'createdAt': s.createdAt.toIso8601String(),
+                  'createdAt': s.createdAt?.toIso8601String(),
                   'lastActiveAt': null,
                   'expiresAt': s.expiresAt.toIso8601String(),
                 },
@@ -1399,7 +1399,7 @@ class AuthRouter {
       if (claims['typ'] != 'access') return null;
       final userId = claims['sub'] as String?;
       if (userId == null) return null;
-      return authService.userStore.findById(userId);
+      return await authService.userStore.findById(userId);
     } on JWTException {
       return null;
     }

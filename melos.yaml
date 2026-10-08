@@ -1,8 +1,0 @@
-name: awesome-dart-auth
-packages:
-  - packages/**
-  - examples/**
-
-scripts:
-  analyze: melos exec --fail-fast -- dart analyze .
-  test: melos exec --fail-fast --dir-exists=test -- dart test

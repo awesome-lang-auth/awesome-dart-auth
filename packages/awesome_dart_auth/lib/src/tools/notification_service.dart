@@ -158,9 +158,10 @@ class NotificationService {
   Future<void> _postJson(
     String url,
     String apiKey,
-    Map<String, Object?> body,
-    {String? username, String? password},
-  ) async {
+    Map<String, Object?> body, {
+    String? username,
+    String? password,
+  }) async {
     final uri = Uri.parse(url);
     final request = await _httpClient.postUrl(uri);
     request.headers.contentType = ContentType.json;
@@ -173,7 +174,7 @@ class NotificationService {
     }
     request.write(jsonEncode(body));
     final response = await request.close();
-    await response.drain();
+    await response.drain<void>();
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw StateError(
         'Notification delivery failed for $url with status '
