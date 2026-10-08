@@ -50,7 +50,7 @@ class WebhookSender {
       }
       request.write(body);
       final response = await request.close();
-      await response.drain();
+      await response.drain<void>();
       return response.statusCode >= 200 && response.statusCode < 300;
     } on Object {
       return false;

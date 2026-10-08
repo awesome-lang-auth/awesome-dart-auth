@@ -10,11 +10,11 @@ void main() {
     final result = renderer.render(
       templateName: 'welcome',
       locale: 'fr',
-      context: const {'name': 'Ada'},
+      context: const {'loginUrl': 'https://example.com/login'},
     );
 
-    expect(result, contains('Ada'));
-    expect(result, contains('Welcome'));
+    expect(result, contains('Your account has been created successfully'));
+    expect(result, contains('example.com'));
   });
 
   test('renders newly ported built-in templates', () {

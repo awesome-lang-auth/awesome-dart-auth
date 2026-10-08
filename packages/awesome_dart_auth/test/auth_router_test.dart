@@ -73,7 +73,9 @@ class _SessionStore implements AdminSessionStore {
   @override
   Future<void> save(AuthSession session) async {
     sessions[session.id] = session;
-    _idByHandle[session.handle] = session.id;
+    if (session.handle case final handle?) {
+      _idByHandle[handle] = session.id;
+    }
   }
 
   @override
@@ -88,7 +90,7 @@ class _SessionStore implements AdminSessionStore {
           (s) =>
               needle == null ||
               s.userId.toLowerCase().contains(needle) ||
-              s.handle.toLowerCase().contains(needle) ||
+              (s.handle?.toLowerCase().contains(needle) ?? false) ||
               (s.userAgent?.toLowerCase().contains(needle) ?? false),
         )
         .toList(growable: false);

@@ -12,6 +12,12 @@ class _UserStore implements UserStore {
 
   @override
   Future<AuthUser> save(AuthUser user) async => user;
+
+  @override
+  Future<AuthUser> update(AuthUser user) async => user;
+
+  @override
+  Future<void> delete(String id) async {}
 }
 
 class _SessionStore implements SessionStore {
@@ -42,7 +48,7 @@ void main() {
         .addHandler((_) => Response.ok('downstream'));
 
     final response = await handler(
-      Request('GET', Uri.parse('http://localhost/auth/ui')),
+      Request('GET', Uri.parse('http://localhost/auth/ui/login')),
     );
 
     expect(response.statusCode, 200);

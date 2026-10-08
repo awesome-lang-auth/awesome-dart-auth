@@ -1149,7 +1149,7 @@ class AuthRouter {
                   'userId': s.userId,
                   'ipAddress': s.ipAddress,
                   'userAgent': s.userAgent,
-                  'createdAt': s.createdAt.toIso8601String(),
+                  'createdAt': s.createdAt?.toIso8601String(),
                   'lastActiveAt': null,
                   'expiresAt': s.expiresAt.toIso8601String(),
                 },
